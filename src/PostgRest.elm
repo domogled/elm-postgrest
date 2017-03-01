@@ -290,14 +290,14 @@ embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query schema (Param
 {-| -}
 embedMany :
     (schema1 -> Relationship HasMany id2)
+    -> Query id2 schema2 a
     -> { limit : Limit
        , filters : List (schema2 -> Filter)
        , order : List (schema2 -> OrderBy)
        }
-    -> Query id2 schema2 a
     -> Query id1 schema1 (List a -> b)
     -> Query id1 schema1 b
-embedMany _ options (Query subSchema (Parameters subParams) subDecoder) (Query schema (Parameters params) decoder) =
+embedMany _ (Query subSchema (Parameters subParams) subDecoder) options (Query schema (Parameters params) decoder) =
     let
         newSubParams =
             { subParams
