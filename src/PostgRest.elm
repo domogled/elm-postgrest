@@ -5,7 +5,6 @@ module PostgRest
         , Query
         , OrderBy
         , Filter
-        , Limit
         , Page
         , Relationship
         , HasOne
@@ -39,8 +38,6 @@ module PostgRest
         , not
         , asc
         , desc
-        , limitTo
-        , noLimit
         , many
         , single
         , paginate
@@ -70,9 +67,6 @@ I recommend looking at the [examples](https://github.com/john-kelly/elm-postgres
 
 ### Ordering
 @docs OrderBy, asc, desc
-
-### Limiting
-@docs Limit, limitTo, noLimit
 
 # Send a Query
 @docs many, single
@@ -106,7 +100,7 @@ type Parameters
         , select : List String
         , order : List OrderBy
         , filter : List Filter
-        , limit : Limit
+        , limit : Maybe Int
         , embedded : List Parameters
         }
 
@@ -127,12 +121,6 @@ type Field a
 type OrderBy
     = Asc String
     | Desc String
-
-
-{-| -}
-type Limit
-    = NoLimit
-    | LimitTo Int
 
 
 {-| -}
@@ -256,7 +244,7 @@ query (Schema name fields) ctor =
             , select = []
             , filter = []
             , order = []
-            , limit = NoLimit
+            , limit = Nothing
             , embedded = []
             }
         )
@@ -291,7 +279,7 @@ embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Param
 embedMany :
     (fields1 -> Relationship HasMany id2)
     -> Query id2 fields2 a
-    -> { limit : Limit
+    -> { limit : Maybe Int
        , filters : List (fields2 -> Filter)
        , order : List (fields2 -> OrderBy)
        }
@@ -327,18 +315,6 @@ hardcoded val (Query fields params queryDecoder) =
     Query fields
         params
         (apply queryDecoder (Decode.succeed val))
-
-
-{-| -}
-limitTo : Int -> Limit
-limitTo limit =
-    LimitTo limit
-
-
-{-| -}
-noLimit : Limit
-noLimit =
-    NoLimit
 
 
 {-| -}
@@ -450,7 +426,7 @@ desc getField fields =
 {-| -}
 many :
     String
-    -> { limit : Limit
+    -> { limit : Maybe Int
        , filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
        }
@@ -538,7 +514,7 @@ paginate url { page, size } options (Query fields (Parameters params) decoder) =
             { params
                 | filter = List.map (\getFilter -> getFilter fields) options.filters
                 , order = List.map (\getOrder -> getOrder fields) options.order
-                , limit = (LimitTo size)
+                , limit = (Just size)
             }
 
         settings =
@@ -665,14 +641,14 @@ offsetToKeyValue maybeOffset =
             [ ( "offset", toString offset ) ]
 
 
-labelParamsHelper : String -> Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Limit ) )
+labelParamsHelper : String -> Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ) )
 labelParamsHelper prefix (Parameters params) =
     let
         labelWithPrefix : a -> ( String, a )
         labelWithPrefix =
             (,) prefix
 
-        labelNested : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Limit ) )
+        labelNested : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ) )
         labelNested (Parameters params) =
             labelParamsHelper (prefix ++ params.name ++ ".") (Parameters params)
 
@@ -691,7 +667,7 @@ labelParamsHelper prefix (Parameters params) =
         labeledFilters =
             List.map labelWithPrefix params.filter
 
-        labeledLimit : List ( String, Limit )
+        labeledLimit : List ( String, Maybe Int )
         labeledLimit =
             [ labelWithPrefix params.limit ]
     in
@@ -706,7 +682,7 @@ a query is embedded in another query. We would still need an operation to flatte
 the QueryParams, but the logic would be much simpler (would no longer be a weird
 concatMap) This may be a good idea / improve performance a smudge (prematureoptimzation much?)
 -}
-labelParams : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Limit ) )
+labelParams : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ) )
 labelParams =
     labelParamsHelper ""
 
@@ -801,16 +777,16 @@ labeledOrdersToKeyValue orders =
             |> List.filterMap labeledOrderToKeyValue
 
 
-labeledLimitsToKeyValue : List ( String, Limit ) -> List ( String, String )
+labeledLimitsToKeyValue : List ( String, Maybe Int ) -> List ( String, String )
 labeledLimitsToKeyValue limits =
     let
-        toKeyValue : ( String, Limit ) -> Maybe ( String, String )
+        toKeyValue : ( String, Maybe Int ) -> Maybe ( String, String )
         toKeyValue labeledLimit =
             case labeledLimit of
-                ( _, NoLimit ) ->
+                ( _, Nothing ) ->
                     Nothing
 
-                ( prefix, LimitTo limit ) ->
+                ( prefix, Just limit ) ->
                     Just ( prefix ++ "limit", toString limit )
     in
         List.filterMap toKeyValue limits

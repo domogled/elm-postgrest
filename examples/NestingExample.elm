@@ -37,7 +37,7 @@ sessionCmd =
             |> PG.many "http://postgrest.herokuapp.com/"
                 { filters = [ .location |> PG.not PG.ilike "%russia%" ]
                 , order = [ PG.asc .start_time ]
-                , limit = PG.noLimit
+                , limit = Nothing
                 }
             |> Http.send Fetch
 
