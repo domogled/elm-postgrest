@@ -279,9 +279,9 @@ embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Param
 embedMany :
     (fields1 -> Relationship HasMany id2)
     -> Query id2 fields2 a
-    -> { limit : Maybe Int
-       , filters : List (fields2 -> Filter)
+    -> { filters : List (fields2 -> Filter)
        , order : List (fields2 -> OrderBy)
+       , limit : Maybe Int
        }
     -> Query id1 fields1 (List a -> b)
     -> Query id1 fields1 b
@@ -426,9 +426,9 @@ desc getField fields =
 {-| -}
 many :
     String
-    -> { limit : Maybe Int
-       , filters : List (fields -> Filter)
+    -> { filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
+       , limit : Maybe Int
        }
     -> Query id fields a
     -> Http.Request (List a)
