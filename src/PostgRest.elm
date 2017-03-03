@@ -101,6 +101,7 @@ type Parameters
         , order : List OrderBy
         , filter : List Filter
         , limit : Maybe Int
+        , offset : Maybe Int
         , embedded : List Parameters
         }
 
@@ -245,6 +246,7 @@ query (Schema name fields) ctor =
             , filter = []
             , order = []
             , limit = Nothing
+            , offset = Nothing
             , embedded = []
             }
         )
@@ -282,6 +284,7 @@ embedMany :
     -> { filters : List (fields2 -> Filter)
        , order : List (fields2 -> OrderBy)
        , limit : Maybe Int
+       , offset : Maybe Int
        }
     -> Query id1 fields1 (List a -> b)
     -> Query id1 fields1 b
@@ -289,9 +292,10 @@ embedMany _ (Query subFields (Parameters subParams) subDecoder) options (Query f
     let
         newSubParams =
             { subParams
-                | limit = options.limit
-                , filter = List.map (\getFilter -> getFilter subFields) options.filters
+                | filter = List.map (\getFilter -> getFilter subFields) options.filters
                 , order = List.map (\getOrder -> getOrder subFields) options.order
+                , limit = options.limit
+                , offset = options.offset
             }
     in
         Query fields
@@ -429,6 +433,7 @@ requestMany :
     -> { filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
        , limit : Maybe Int
+       , offset : Maybe Int
        }
     -> Query id fields a
     -> Http.Request (List a)
@@ -436,15 +441,15 @@ requestMany url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
-                | limit = options.limit
-                , filter = List.map (\getFilter -> getFilter fields) options.filters
+                | filter = List.map (\getFilter -> getFilter fields) options.filters
                 , order = List.map (\getOrder -> getOrder fields) options.order
+                , limit = options.limit
+                , offset = options.offset
             }
 
         settings =
             { count = False
             , singular = False
-            , offset = Nothing
             }
 
         ( headers, queryUrl ) =
@@ -479,7 +484,6 @@ requestOne url filters (Query fields (Parameters params) decoder) =
         settings =
             { count = False
             , singular = True
-            , offset = Nothing
             }
 
         ( headers, queryUrl ) =
@@ -502,26 +506,26 @@ requestOne url filters (Query fields (Parameters params) decoder) =
 {-| -}
 requestPage :
     String
-    -> { page : Int, size : Int }
     -> { filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
+       , page : Int
+       , size : Int
        }
     -> Query id fields a
     -> Http.Request (Page a)
-requestPage url { page, size } options (Query fields (Parameters params) decoder) =
+requestPage url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
                 | filter = List.map (\getFilter -> getFilter fields) options.filters
                 , order = List.map (\getOrder -> getOrder fields) options.order
-                , limit = (Just size)
+                , limit = (Just options.size)
+                , offset = Just ((options.page - 1) * options.size)
             }
 
         settings =
-            -- NOTE: page is NOT 0 indexed. the first page is 1.
             { count = True
             , singular = False
-            , offset = Just ((page - 1) * size)
             }
 
         ( headers, queryUrl ) =
@@ -557,14 +561,13 @@ requestPage url { page, size } options (Query fields (Parameters params) decoder
 type alias Settings =
     { count : Bool
     , singular : Bool
-    , offset : Maybe Int
     }
 
 
 getHeadersAndQueryUrl : Settings -> String -> String -> Parameters -> ( List Http.Header, String )
 getHeadersAndQueryUrl settings url name p =
     let
-        { count, singular, offset } =
+        { count, singular } =
             settings
 
         trailingSlashUrl =
@@ -573,15 +576,15 @@ getHeadersAndQueryUrl settings url name p =
             else
                 url ++ "/"
 
-        ( labeledOrders, labeledFilters, labeledLimits ) =
+        ( labeledOrders, labeledFilters, labeledLimits, labeledOffset ) =
             labelParams p
 
         queryUrl =
             [ selectsToKeyValue p
             , labeledFiltersToKeyValues labeledFilters
             , labeledOrdersToKeyValue labeledOrders
-            , labeledLimitsToKeyValue labeledLimits
-            , offsetToKeyValue offset
+            , labeledMaybeIntToKeyValue "limit" labeledLimits
+            , labeledMaybeIntToKeyValue "offset" labeledOffset
             ]
                 |> List.foldl (++) []
                 |> queryParamsToUrl (trailingSlashUrl ++ name)
@@ -631,33 +634,30 @@ selectsToKeyValue (Parameters params) =
         [ ( "select", selection ) ]
 
 
-offsetToKeyValue : Maybe Int -> List ( String, String )
-offsetToKeyValue maybeOffset =
-    case maybeOffset of
-        Nothing ->
-            []
-
-        Just offset ->
-            [ ( "offset", toString offset ) ]
-
-
-labelParamsHelper : String -> Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ) )
+labelParamsHelper :
+    String
+    -> Parameters
+    -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ), List ( String, Maybe Int ) )
 labelParamsHelper prefix (Parameters params) =
     let
         labelWithPrefix : a -> ( String, a )
         labelWithPrefix =
             (,) prefix
 
-        labelNested : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ) )
+        labelNested : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ), List ( String, Maybe Int ) )
         labelNested (Parameters params) =
             labelParamsHelper (prefix ++ params.name ++ ".") (Parameters params)
 
         appendTriples :
-            ( appendable1, appendable2, appendable3 )
-            -> ( appendable1, appendable2, appendable3 )
-            -> ( appendable1, appendable2, appendable3 )
-        appendTriples ( os1, fs1, ls1 ) ( os2, fs2, ls2 ) =
-            ( os1 ++ os2, fs1 ++ fs2, ls1 ++ ls2 )
+            ( appendable1, appendable2, appendable3, appendable4 )
+            -> ( appendable1, appendable2, appendable3, appendable4 )
+            -> ( appendable1, appendable2, appendable3, appendable4 )
+        appendTriples ( os1, fs1, ls1, of1 ) ( os2, fs2, ls2, of2 ) =
+            ( os1 ++ os2
+            , fs1 ++ fs2
+            , ls1 ++ ls2
+            , of1 ++ of2
+            )
 
         labeledOrders : List ( String, OrderBy )
         labeledOrders =
@@ -670,10 +670,19 @@ labelParamsHelper prefix (Parameters params) =
         labeledLimit : List ( String, Maybe Int )
         labeledLimit =
             [ labelWithPrefix params.limit ]
+
+        labeledOffset : List ( String, Maybe Int )
+        labeledOffset =
+            [ labelWithPrefix params.offset ]
     in
         params.embedded
             |> List.map labelNested
-            |> List.foldl appendTriples ( labeledOrders, labeledFilters, labeledLimit )
+            |> List.foldl appendTriples
+                ( labeledOrders
+                , labeledFilters
+                , labeledLimit
+                , labeledOffset
+                )
 
 
 {-| NOTE: What if we were to label when we add?
@@ -682,7 +691,7 @@ a query is embedded in another query. We would still need an operation to flatte
 the QueryParams, but the logic would be much simpler (would no longer be a weird
 concatMap) This may be a good idea / improve performance a smudge (prematureoptimzation much?)
 -}
-labelParams : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ) )
+labelParams : Parameters -> ( List ( String, OrderBy ), List ( String, Filter ), List ( String, Maybe Int ), List ( String, Maybe Int ) )
 labelParams =
     labelParamsHelper ""
 
@@ -777,19 +786,19 @@ labeledOrdersToKeyValue orders =
             |> List.filterMap labeledOrderToKeyValue
 
 
-labeledLimitsToKeyValue : List ( String, Maybe Int ) -> List ( String, String )
-labeledLimitsToKeyValue limits =
+labeledMaybeIntToKeyValue : String -> List ( String, Maybe Int ) -> List ( String, String )
+labeledMaybeIntToKeyValue option list =
     let
         toKeyValue : ( String, Maybe Int ) -> Maybe ( String, String )
-        toKeyValue labeledLimit =
-            case labeledLimit of
+        toKeyValue labeled =
+            case labeled of
                 ( _, Nothing ) ->
                     Nothing
 
-                ( prefix, Just limit ) ->
-                    Just ( prefix ++ "limit", toString limit )
+                ( prefix, Just v ) ->
+                    Just ( prefix ++ option, toString v )
     in
-        List.filterMap toKeyValue limits
+        List.filterMap toKeyValue list
 
 
 {-| Copy pasta of the old Http.url

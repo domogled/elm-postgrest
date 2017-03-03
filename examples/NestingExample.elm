@@ -38,6 +38,7 @@ sessionCmd =
                 { filters = [ .location |> PG.not PG.ilike "%russia%" ]
                 , order = [ PG.asc .start_time ]
                 , limit = Nothing
+                , offset = Nothing
                 }
             |> Http.send Fetch
 
