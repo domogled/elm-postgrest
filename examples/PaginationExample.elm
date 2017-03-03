@@ -18,7 +18,7 @@ sessionCmd =
         |> PG.select .id
         |> PG.select .location
         |> PG.select .start_time
-        |> PG.paginate "http://postgrest.herokuapp.com/"
+        |> PG.requestPage "http://postgrest.herokuapp.com/"
             { page = 2, size = 1 }
             { filters = [], order = [] }
         |> Http.send Fetch
