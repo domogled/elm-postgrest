@@ -90,13 +90,13 @@ import String
 
 
 {-| -}
-type Schema id schema
-    = Schema String schema
+type Schema id fields
+    = Schema String fields
 
 
 {-| -}
-type Query id schema a
-    = Query schema Parameters (Decode.Decoder a)
+type Query id fields a
+    = Query fields Parameters (Decode.Decoder a)
 
 
 {-| -}
@@ -197,7 +197,7 @@ hasOneNullable id =
 
 
 {-| -}
-schema : id -> String -> schema -> Schema id schema
+schema : id -> String -> fields -> Schema id fields
 schema id name s =
     Schema name s
 
@@ -248,9 +248,9 @@ nullable (Field decoder urlEncoder name) =
 
 
 {-| -}
-query : Schema id schema -> (a -> b) -> Query id schema (a -> b)
-query (Schema name schema) ctor =
-    Query schema
+query : Schema id fields -> (a -> b) -> Query id fields (a -> b)
+query (Schema name fields) ctor =
+    Query fields
         (Parameters
             { name = name
             , select = []
@@ -265,39 +265,39 @@ query (Schema name schema) ctor =
 
 {-| -}
 embed :
-    (schema1 -> Relationship HasOne id2)
-    -> Query id2 schema2 a
-    -> Query id1 schema1 (a -> b)
-    -> Query id1 schema1 b
-embed _ (Query _ (Parameters subParams) subDecoder) (Query schema (Parameters params) decoder) =
-    Query schema
+    (fields1 -> Relationship HasOne id2)
+    -> Query id2 fields2 a
+    -> Query id1 fields1 (a -> b)
+    -> Query id1 fields1 b
+embed _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
+    Query fields
         (Parameters { params | embedded = (Parameters subParams) :: params.embedded })
         (apply decoder (Decode.field subParams.name subDecoder))
 
 
 {-| -}
 embedNullable :
-    (schema1 -> Relationship HasOneNullable id2)
-    -> Query id2 schema2 a
-    -> Query id1 schema1 (Maybe a -> b)
-    -> Query id1 schema1 b
-embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query schema (Parameters params) decoder) =
-    Query schema
+    (fields1 -> Relationship HasOneNullable id2)
+    -> Query id2 fields2 a
+    -> Query id1 fields1 (Maybe a -> b)
+    -> Query id1 fields1 b
+embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
+    Query fields
         (Parameters { params | embedded = (Parameters subParams) :: params.embedded })
         (apply decoder (Decode.field subParams.name (Decode.nullable subDecoder)))
 
 
 {-| -}
 embedMany :
-    (schema1 -> Relationship HasMany id2)
-    -> Query id2 schema2 a
+    (fields1 -> Relationship HasMany id2)
+    -> Query id2 fields2 a
     -> { limit : Limit
-       , filters : List (schema2 -> Filter)
-       , order : List (schema2 -> OrderBy)
+       , filters : List (fields2 -> Filter)
+       , order : List (fields2 -> OrderBy)
        }
-    -> Query id1 schema1 (List a -> b)
-    -> Query id1 schema1 b
-embedMany _ (Query subSchema (Parameters subParams) subDecoder) options (Query schema (Parameters params) decoder) =
+    -> Query id1 fields1 (List a -> b)
+    -> Query id1 fields1 b
+embedMany _ (Query subSchema (Parameters subParams) subDecoder) options (Query fields (Parameters params) decoder) =
     let
         newSubParams =
             { subParams
@@ -306,25 +306,25 @@ embedMany _ (Query subSchema (Parameters subParams) subDecoder) options (Query s
                 , order = List.map (\getOrder -> getOrder subSchema) options.order
             }
     in
-        Query schema
+        Query fields
             (Parameters { params | embedded = Parameters newSubParams :: params.embedded })
             (apply decoder (Decode.field newSubParams.name (Decode.list subDecoder)))
 
 
 {-| -}
-select : (schema -> Field a) -> Query id schema (a -> b) -> Query id schema b
-select getField (Query schema (Parameters params) queryDecoder) =
-    case getField schema of
+select : (fields -> Field a) -> Query id fields (a -> b) -> Query id fields b
+select getField (Query fields (Parameters params) queryDecoder) =
+    case getField fields of
         Field fieldDecoder _ fieldName ->
-            Query schema
+            Query fields
                 (Parameters { params | select = fieldName :: params.select })
                 (apply queryDecoder (Decode.field fieldName fieldDecoder))
 
 
 {-| -}
-hardcoded : a -> Query id schema (a -> b) -> Query id schema b
-hardcoded val (Query schema params queryDecoder) =
-    Query schema
+hardcoded : a -> Query id fields (a -> b) -> Query id fields b
+hardcoded val (Query fields params queryDecoder) =
+    Query fields
         params
         (apply queryDecoder (Decode.succeed val))
 
@@ -342,9 +342,9 @@ noLimit =
 
 
 {-| -}
-singleValueFilterFn : (String -> Condition) -> a -> (schema -> Field a) -> schema -> Filter
-singleValueFilterFn condCtor condArg getField schema =
-    case getField schema of
+singleValueFilterFn : (String -> Condition) -> a -> (fields -> Field a) -> fields -> Filter
+singleValueFilterFn condCtor condArg getField fields =
+    case getField fields of
         Field _ urlEncoder name ->
             Filter False (condCtor (urlEncoder condArg)) name
 
@@ -352,65 +352,65 @@ singleValueFilterFn condCtor condArg getField schema =
 {-|
 Simple [pattern matching](https://www.postgresql.org/docs/9.5/static/functions-matching.html#FUNCTIONS-LIKE)
 -}
-like : String -> (schema -> Field String) -> schema -> Filter
+like : String -> (fields -> Field String) -> fields -> Filter
 like =
     singleValueFilterFn Like
 
 
 {-| Case-insensitive `like`
 -}
-ilike : String -> (schema -> Field String) -> schema -> Filter
+ilike : String -> (fields -> Field String) -> fields -> Filter
 ilike =
     singleValueFilterFn ILike
 
 
 {-| Equals
 -}
-eq : a -> (schema -> Field a) -> schema -> Filter
+eq : a -> (fields -> Field a) -> fields -> Filter
 eq =
     singleValueFilterFn Eq
 
 
 {-| Greater than or equal to
 -}
-gte : a -> (schema -> Field a) -> schema -> Filter
+gte : a -> (fields -> Field a) -> fields -> Filter
 gte =
     singleValueFilterFn Gte
 
 
 {-| Greater than
 -}
-gt : a -> (schema -> Field a) -> schema -> Filter
+gt : a -> (fields -> Field a) -> fields -> Filter
 gt =
     singleValueFilterFn Gt
 
 
 {-| Less than or equal to
 -}
-lte : a -> (schema -> Field a) -> schema -> Filter
+lte : a -> (fields -> Field a) -> fields -> Filter
 lte =
     singleValueFilterFn Lte
 
 
 {-| Less than
 -}
-lt : a -> (schema -> Field a) -> schema -> Filter
+lt : a -> (fields -> Field a) -> fields -> Filter
 lt =
     singleValueFilterFn Lt
 
 
 {-| In List
 -}
-inList : List a -> (schema -> Field a) -> schema -> Filter
-inList condArgs getField schema =
-    case getField schema of
+inList : List a -> (fields -> Field a) -> fields -> Filter
+inList condArgs getField fields =
+    case getField fields of
         Field _ urlEncoder name ->
             Filter False (In (List.map urlEncoder condArgs)) name
 
 
 {-| Is comparison
 -}
-is : a -> (schema -> Field a) -> schema -> Filter
+is : a -> (fields -> Field a) -> fields -> Filter
 is =
     singleValueFilterFn Is
 
@@ -418,31 +418,31 @@ is =
 {-| Negate a Filter
 -}
 not :
-    (a -> (schema -> Field a) -> schema -> Filter)
+    (a -> (fields -> Field a) -> fields -> Filter)
     -> a
-    -> (schema -> Field a)
-    -> schema
+    -> (fields -> Field a)
+    -> fields
     -> Filter
-not filterCtor val getField schema =
-    case filterCtor val getField schema of
+not filterCtor val getField fields =
+    case filterCtor val getField fields of
         Filter negated cond fieldName ->
             Filter (Basics.not negated) cond fieldName
 
 
 {-| Ascending
 -}
-asc : (schema -> Field a) -> schema -> OrderBy
-asc getField schema =
-    case getField schema of
+asc : (fields -> Field a) -> fields -> OrderBy
+asc getField fields =
+    case getField fields of
         Field _ _ name ->
             Asc name
 
 
 {-| Descending
 -}
-desc : (schema -> Field a) -> schema -> OrderBy
-desc getField schema =
-    case getField schema of
+desc : (fields -> Field a) -> fields -> OrderBy
+desc getField fields =
+    case getField fields of
         Field _ _ name ->
             Desc name
 
@@ -451,18 +451,18 @@ desc getField schema =
 many :
     String
     -> { limit : Limit
-       , filters : List (schema -> Filter)
-       , order : List (schema -> OrderBy)
+       , filters : List (fields -> Filter)
+       , order : List (fields -> OrderBy)
        }
-    -> Query id schema a
+    -> Query id fields a
     -> Http.Request (List a)
-many url options (Query schema (Parameters params) decoder) =
+many url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
                 | limit = options.limit
-                , filter = List.map (\getFilter -> getFilter schema) options.filters
-                , order = List.map (\getOrder -> getOrder schema) options.order
+                , filter = List.map (\getFilter -> getFilter fields) options.filters
+                , order = List.map (\getOrder -> getOrder fields) options.order
             }
 
         settings =
@@ -492,13 +492,13 @@ many url options (Query schema (Parameters params) decoder) =
 -}
 single :
     String
-    -> List (schema -> Filter)
-    -> Query id schema a
+    -> List (fields -> Filter)
+    -> Query id fields a
     -> Http.Request a
-single url filters (Query schema (Parameters params) decoder) =
+single url filters (Query fields (Parameters params) decoder) =
     let
         newParams =
-            { params | filter = List.map (\getFilter -> getFilter schema) filters }
+            { params | filter = List.map (\getFilter -> getFilter fields) filters }
 
         settings =
             { count = False
@@ -527,17 +527,17 @@ single url filters (Query schema (Parameters params) decoder) =
 paginate :
     String
     -> { page : Int, size : Int }
-    -> { filters : List (schema -> Filter)
-       , order : List (schema -> OrderBy)
+    -> { filters : List (fields -> Filter)
+       , order : List (fields -> OrderBy)
        }
-    -> Query id schema a
+    -> Query id fields a
     -> Http.Request (Page a)
-paginate url { page, size } options (Query schema (Parameters params) decoder) =
+paginate url { page, size } options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
-                | filter = List.map (\getFilter -> getFilter schema) options.filters
-                , order = List.map (\getOrder -> getOrder schema) options.order
+                | filter = List.map (\getFilter -> getFilter fields) options.filters
+                , order = List.map (\getOrder -> getOrder fields) options.order
                 , limit = (LimitTo size)
             }
 
