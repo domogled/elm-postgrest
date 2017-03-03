@@ -21,8 +21,8 @@ module PostgRest
         , nullable
         , schema
         , query
-        , embed
-        , embedNullable
+        , embedOne
+        , embedOneNullable
         , embedMany
         , select
         , hardcoded
@@ -38,9 +38,9 @@ module PostgRest
         , not
         , asc
         , desc
-        , many
-        , single
-        , paginate
+        , requestMany
+        , requestOne
+        , requestPage
         )
 
 {-| A query builder library for PostgREST.
@@ -60,7 +60,7 @@ I recommend looking at the [examples](https://github.com/john-kelly/elm-postgres
 @docs Query, query
 
 ### Selecting and Nesting
-@docs select, embed, embedNullable, embedMany, hardcoded
+@docs select, embedOne, embedOneNullable, embedMany, hardcoded
 
 ### Filtering
 @docs Filter, like, ilike, eq, gte, gt, lte, lt, inList, is, not
@@ -69,10 +69,10 @@ I recommend looking at the [examples](https://github.com/john-kelly/elm-postgres
 @docs OrderBy, asc, desc
 
 # Send a Query
-@docs many, single
+@docs requestMany, requestOne
 
 ### Pagination
-@docs Page, paginate
+@docs Page, requestPage
 
 -}
 
@@ -252,24 +252,24 @@ query (Schema name fields) ctor =
 
 
 {-| -}
-embed :
+embedOne :
     (fields1 -> Relationship HasOne id2)
     -> Query id2 fields2 a
     -> Query id1 fields1 (a -> b)
     -> Query id1 fields1 b
-embed _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
+embedOne _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
     Query fields
         (Parameters { params | embedded = (Parameters subParams) :: params.embedded })
         (apply decoder (Decode.field subParams.name subDecoder))
 
 
 {-| -}
-embedNullable :
+embedOneNullable :
     (fields1 -> Relationship HasOneNullable id2)
     -> Query id2 fields2 a
     -> Query id1 fields1 (Maybe a -> b)
     -> Query id1 fields1 b
-embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
+embedOneNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
     Query fields
         (Parameters { params | embedded = (Parameters subParams) :: params.embedded })
         (apply decoder (Decode.field subParams.name (Decode.nullable subDecoder)))
@@ -424,7 +424,7 @@ desc getField fields =
 
 
 {-| -}
-many :
+requestMany :
     String
     -> { filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
@@ -432,7 +432,7 @@ many :
        }
     -> Query id fields a
     -> Http.Request (List a)
-many url options (Query fields (Parameters params) decoder) =
+requestMany url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
@@ -466,12 +466,12 @@ many url options (Query fields (Parameters params) decoder) =
 
 {-| Get single row. Http Error if many or no rows are returned.
 -}
-single :
+requestOne :
     String
     -> List (fields -> Filter)
     -> Query id fields a
     -> Http.Request a
-single url filters (Query fields (Parameters params) decoder) =
+requestOne url filters (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params | filter = List.map (\getFilter -> getFilter fields) filters }
@@ -500,7 +500,7 @@ single url filters (Query fields (Parameters params) decoder) =
 
 
 {-| -}
-paginate :
+requestPage :
     String
     -> { page : Int, size : Int }
     -> { filters : List (fields -> Filter)
@@ -508,7 +508,7 @@ paginate :
        }
     -> Query id fields a
     -> Http.Request (Page a)
-paginate url { page, size } options (Query fields (Parameters params) decoder) =
+requestPage url { page, size } options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
