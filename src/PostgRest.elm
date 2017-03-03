@@ -297,13 +297,13 @@ embedMany :
        }
     -> Query id1 fields1 (List a -> b)
     -> Query id1 fields1 b
-embedMany _ (Query subSchema (Parameters subParams) subDecoder) options (Query fields (Parameters params) decoder) =
+embedMany _ (Query subFields (Parameters subParams) subDecoder) options (Query fields (Parameters params) decoder) =
     let
         newSubParams =
             { subParams
                 | limit = options.limit
-                , filter = List.map (\getFilter -> getFilter subSchema) options.filters
-                , order = List.map (\getOrder -> getOrder subSchema) options.order
+                , filter = List.map (\getFilter -> getFilter subFields) options.filters
+                , order = List.map (\getOrder -> getOrder subFields) options.order
             }
     in
         Query fields
