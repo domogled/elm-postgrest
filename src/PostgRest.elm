@@ -38,9 +38,9 @@ module PostgRest
         , not
         , asc
         , desc
-        , requestMany
-        , requestOne
-        , requestPage
+        , readMany
+        , readOne
+        , readPage
         )
 
 {-| A query builder library for PostgREST.
@@ -69,10 +69,10 @@ I recommend looking at the [examples](https://github.com/john-kelly/elm-postgres
 @docs OrderBy, asc, desc
 
 # Send a Query
-@docs requestMany, requestOne
+@docs readMany, readOne
 
 ### Pagination
-@docs Page, requestPage
+@docs Page, readPage
 
 -}
 
@@ -428,7 +428,7 @@ desc getField fields =
 
 
 {-| -}
-requestMany :
+readMany :
     String
     -> { filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
@@ -437,7 +437,7 @@ requestMany :
        }
     -> Query id fields a
     -> Http.Request (List a)
-requestMany url options (Query fields (Parameters params) decoder) =
+readMany url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
@@ -471,12 +471,12 @@ requestMany url options (Query fields (Parameters params) decoder) =
 
 {-| Get single row. Http Error if many or no rows are returned.
 -}
-requestOne :
+readOne :
     String
     -> List (fields -> Filter)
     -> Query id fields a
     -> Http.Request a
-requestOne url filters (Query fields (Parameters params) decoder) =
+readOne url filters (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params | filter = List.map (\getFilter -> getFilter fields) filters }
@@ -504,7 +504,7 @@ requestOne url filters (Query fields (Parameters params) decoder) =
 
 
 {-| -}
-requestPage :
+readPage :
     String
     -> { filters : List (fields -> Filter)
        , order : List (fields -> OrderBy)
@@ -513,7 +513,7 @@ requestPage :
        }
     -> Query id fields a
     -> Http.Request (Page a)
-requestPage url options (Query fields (Parameters params) decoder) =
+readPage url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
