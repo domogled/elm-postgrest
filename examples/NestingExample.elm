@@ -34,8 +34,8 @@ sessionCmd =
             |> PG.select .location
             |> PG.select .start_time
             |> PG.embedOne .speaker speakerQuery
-            |> PG.requestMany "http://postgrest.herokuapp.com/"
-                { filters = [ .location |> PG.not PG.ilike "%russia%" ]
+            |> PG.readMany "http://postgrest.herokuapp.com/"
+                { filter = [ .location |> PG.not PG.ilike "%russia%" ]
                 , order = [ PG.asc .start_time ]
                 , limit = Nothing
                 , offset = Nothing

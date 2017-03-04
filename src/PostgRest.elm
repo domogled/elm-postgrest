@@ -281,7 +281,7 @@ embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Param
 embedMany :
     (fields1 -> Relationship HasMany id2)
     -> Query id2 fields2 a
-    -> { filters : List (fields2 -> Filter)
+    -> { filter : List (fields2 -> Filter)
        , order : List (fields2 -> OrderBy)
        , limit : Maybe Int
        , offset : Maybe Int
@@ -292,7 +292,7 @@ embedMany _ (Query subFields (Parameters subParams) subDecoder) options (Query f
     let
         newSubParams =
             { subParams
-                | filter = List.map (\getFilter -> getFilter subFields) options.filters
+                | filter = List.map (\getFilter -> getFilter subFields) options.filter
                 , order = List.map (\getOrder -> getOrder subFields) options.order
                 , limit = options.limit
                 , offset = options.offset
@@ -430,7 +430,7 @@ desc getField fields =
 {-| -}
 readMany :
     String
-    -> { filters : List (fields -> Filter)
+    -> { filter : List (fields -> Filter)
        , order : List (fields -> OrderBy)
        , limit : Maybe Int
        , offset : Maybe Int
@@ -441,7 +441,7 @@ readMany url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
-                | filter = List.map (\getFilter -> getFilter fields) options.filters
+                | filter = List.map (\getFilter -> getFilter fields) options.filter
                 , order = List.map (\getOrder -> getOrder fields) options.order
                 , limit = options.limit
                 , offset = options.offset
@@ -476,10 +476,10 @@ readOne :
     -> List (fields -> Filter)
     -> Query id fields a
     -> Http.Request a
-readOne url filters (Query fields (Parameters params) decoder) =
+readOne url filter (Query fields (Parameters params) decoder) =
     let
         newParams =
-            { params | filter = List.map (\getFilter -> getFilter fields) filters }
+            { params | filter = List.map (\getFilter -> getFilter fields) filter }
 
         settings =
             { count = False
@@ -506,7 +506,7 @@ readOne url filters (Query fields (Parameters params) decoder) =
 {-| -}
 readPage :
     String
-    -> { filters : List (fields -> Filter)
+    -> { filter : List (fields -> Filter)
        , order : List (fields -> OrderBy)
        , page : Int
        , size : Int
@@ -517,7 +517,7 @@ readPage url options (Query fields (Parameters params) decoder) =
     let
         newParams =
             { params
-                | filter = List.map (\getFilter -> getFilter fields) options.filters
+                | filter = List.map (\getFilter -> getFilter fields) options.filter
                 , order = List.map (\getOrder -> getOrder fields) options.order
                 , limit = (Just options.size)
                 , offset = Just ((options.page - 1) * options.size)
@@ -697,7 +697,7 @@ labelParams =
 
 
 labeledFiltersToKeyValues : List ( String, Filter ) -> List ( String, String )
-labeledFiltersToKeyValues filters =
+labeledFiltersToKeyValues filter =
     let
         contToString : Condition -> String
         contToString cond =
@@ -738,7 +738,7 @@ labeledFiltersToKeyValues filters =
                 Filter False cond key ->
                     ( prefix ++ key, contToString cond )
     in
-        List.map filterToKeyValue filters
+        List.map filterToKeyValue filter
 
 
 labeledOrdersToKeyValue : List ( String, OrderBy ) -> List ( String, String )

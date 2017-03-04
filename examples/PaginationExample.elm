@@ -18,8 +18,8 @@ sessionCmd =
         |> PG.select .id
         |> PG.select .location
         |> PG.select .start_time
-        |> PG.requestPage "http://postgrest.herokuapp.com/"
-            { filters = []
+        |> PG.readPage "http://postgrest.herokuapp.com/"
+            { filter = []
             , order = []
             , page = 2
             , size = 1
