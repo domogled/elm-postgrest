@@ -8,10 +8,10 @@ module PostgRest
         , Page
         , Relationship
         , HasOne
-        , HasOneNullable
+        , HasNullable
         , HasMany
         , hasOne
-        , hasOneNullable
+        , hasNullable
         , hasMany
         , field
         , string
@@ -22,7 +22,7 @@ module PostgRest
         , schema
         , query
         , embedOne
-        , embedOneNullable
+        , embedNullable
         , embedMany
         , select
         , hardcoded
@@ -54,13 +54,13 @@ I recommend looking at the [examples](https://github.com/john-kelly/elm-postgres
 @docs Field, string, int, float, bool, field, nullable
 
 ### Relationships
-@docs Relationship, HasOne, hasOne, HasOneNullable, hasOneNullable, HasMany, hasMany
+@docs Relationship, HasOne, hasOne, HasNullable, hasNullable, HasMany, hasMany
 
 # Build a Query
 @docs Query, query
 
 ### Selecting and Nesting
-@docs select, embedOne, embedOneNullable, embedMany, hardcoded
+@docs select, embedOne, embedNullable, embedMany, hardcoded
 
 ### Filtering
 @docs Filter, like, ilike, eq, gte, gt, lte, lt, inList, is, not
@@ -158,8 +158,8 @@ type HasOne
 
 
 {-| -}
-type HasOneNullable
-    = HasOneNullable HasOneNullable
+type HasNullable
+    = HasNullable HasNullable
 
 
 {-| -}
@@ -180,8 +180,8 @@ hasMany id =
 
 
 {-| -}
-hasOneNullable : id -> Relationship HasOneNullable id
-hasOneNullable id =
+hasNullable : id -> Relationship HasNullable id
+hasNullable id =
     Relationship
 
 
@@ -266,12 +266,12 @@ embedOne _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters
 
 
 {-| -}
-embedOneNullable :
-    (fields1 -> Relationship HasOneNullable id2)
+embedNullable :
+    (fields1 -> Relationship HasNullable id2)
     -> Query id2 fields2 a
     -> Query id1 fields1 (Maybe a -> b)
     -> Query id1 fields1 b
-embedOneNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
+embedNullable _ (Query _ (Parameters subParams) subDecoder) (Query fields (Parameters params) decoder) =
     Query fields
         (Parameters { params | embedded = (Parameters subParams) :: params.embedded })
         (apply decoder (Decode.field subParams.name (Decode.nullable subDecoder)))
