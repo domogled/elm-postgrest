@@ -19,8 +19,8 @@ sessionCmd =
         |> PG.select .location
         |> PG.select .start_time
         |> PG.readMany "http://postgrest.herokuapp.com/"
-            { filter = [ .location |> PG.not PG.ilike "%russia%" ]
-            , order = [ PG.asc .start_time ]
+            { filter = [ .location >> PG.not PG.ilike "%russia%" ]
+            , order = [ .start_time >> PG.asc ]
             , limit = Nothing
             , offset = Nothing
             }

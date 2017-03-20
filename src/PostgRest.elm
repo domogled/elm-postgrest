@@ -331,9 +331,9 @@ map fn (Query fields params queryDecoder) =
 
 
 {-| -}
-singleValueFilterFn : (String -> Condition) -> a -> (fields -> Field a) -> fields -> Filter
-singleValueFilterFn condCtor condArg getField fields =
-    case getField fields of
+singleValueFilterFn : (String -> Condition) -> a -> Field a -> Filter
+singleValueFilterFn condCtor condArg field =
+    case field of
         Field _ urlEncoder name ->
             Filter False (condCtor (urlEncoder condArg)) name
 
@@ -341,65 +341,65 @@ singleValueFilterFn condCtor condArg getField fields =
 {-|
 Simple [pattern matching](https://www.postgresql.org/docs/9.5/static/functions-matching.html#FUNCTIONS-LIKE)
 -}
-like : String -> (fields -> Field String) -> fields -> Filter
+like : String -> Field String -> Filter
 like =
     singleValueFilterFn Like
 
 
 {-| Case-insensitive `like`
 -}
-ilike : String -> (fields -> Field String) -> fields -> Filter
+ilike : String -> Field String -> Filter
 ilike =
     singleValueFilterFn ILike
 
 
 {-| Equals
 -}
-eq : a -> (fields -> Field a) -> fields -> Filter
+eq : a -> Field a -> Filter
 eq =
     singleValueFilterFn Eq
 
 
 {-| Greater than or equal to
 -}
-gte : a -> (fields -> Field a) -> fields -> Filter
+gte : a -> Field a -> Filter
 gte =
     singleValueFilterFn Gte
 
 
 {-| Greater than
 -}
-gt : a -> (fields -> Field a) -> fields -> Filter
+gt : a -> Field a -> Filter
 gt =
     singleValueFilterFn Gt
 
 
 {-| Less than or equal to
 -}
-lte : a -> (fields -> Field a) -> fields -> Filter
+lte : a -> Field a -> Filter
 lte =
     singleValueFilterFn Lte
 
 
 {-| Less than
 -}
-lt : a -> (fields -> Field a) -> fields -> Filter
+lt : a -> Field a -> Filter
 lt =
     singleValueFilterFn Lt
 
 
 {-| In List
 -}
-inList : List a -> (fields -> Field a) -> fields -> Filter
-inList condArgs getField fields =
-    case getField fields of
+inList : List a -> Field a -> Filter
+inList condArgs field =
+    case field of
         Field _ urlEncoder name ->
             Filter False (In (List.map urlEncoder condArgs)) name
 
 
 {-| Is comparison
 -}
-is : a -> (fields -> Field a) -> fields -> Filter
+is : a -> Field a -> Filter
 is =
     singleValueFilterFn Is
 
@@ -407,31 +407,30 @@ is =
 {-| Negate a Filter
 -}
 not :
-    (a -> (fields -> Field a) -> fields -> Filter)
+    (a -> Field a -> Filter)
     -> a
-    -> (fields -> Field a)
-    -> fields
+    -> Field a
     -> Filter
-not filterCtor val getField fields =
-    case filterCtor val getField fields of
+not filterCtor val field =
+    case filterCtor val field of
         Filter negated cond fieldName ->
             Filter (Basics.not negated) cond fieldName
 
 
 {-| Ascending
 -}
-asc : (fields -> Field a) -> fields -> OrderBy
-asc getField fields =
-    case getField fields of
+asc : Field a -> OrderBy
+asc field =
+    case field of
         Field _ _ name ->
             Asc name
 
 
 {-| Descending
 -}
-desc : (fields -> Field a) -> fields -> OrderBy
-desc getField fields =
-    case getField fields of
+desc : Field a -> OrderBy
+desc field =
+    case field of
         Field _ _ name ->
             Desc name
 

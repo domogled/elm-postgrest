@@ -31,9 +31,10 @@ pokemonRequest =
     PG.query pokemonSchema Pokemon
         |> PG.select .id
         |> PG.select .name
-        |> PG.many "http://localhost:8000/"
-            { filters = [ .id |> PG.lte 151 ]
-            , orders = [ PG.asc .id ]
-            , limit = PG.noLimit
+        |> PG.readMany "http://localhost:8000/"
+            { filter = [ .id >> PG.lte 151 ]
+            , order = [ .id >> PG.asc ]
+            , limit = Nothing
+            , offset = 0
             }
 ```
