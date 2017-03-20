@@ -26,6 +26,7 @@ module PostgRest
         , embedMany
         , select
         , hardcoded
+        , map
         , like
         , eq
         , gte
@@ -319,6 +320,14 @@ hardcoded val (Query fields params queryDecoder) =
     Query fields
         params
         (apply queryDecoder (Decode.succeed val))
+
+
+{-| -}
+map : (a -> b) -> Query id fields a -> Query id fields b
+map fn (Query fields params queryDecoder) =
+    Query fields
+        params
+        (Decode.map fn queryDecoder)
 
 
 {-| -}
