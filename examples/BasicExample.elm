@@ -22,7 +22,7 @@ sessionCmd =
             { filter = [ .location >> PG.not PG.ilike "%russia%" ]
             , order = [ .start_time >> PG.asc ]
             , limit = Nothing
-            , offset = Nothing
+            , offset = 0
             }
         |> Http.send Fetch
 
